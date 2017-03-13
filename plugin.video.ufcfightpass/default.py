@@ -10,6 +10,8 @@ addon_handle    = int(sys.argv[1])
 addon_BASE_PATH = xbmc.translatePath(xbmcaddon.Addon().getAddonInfo('profile'))
 COOKIE_FILE     = os.path.join(addon_BASE_PATH, 'cookies.lwp')
 CACHE_FILE      = os.path.join(addon_BASE_PATH, 'data.json')
+c_base_url      = 'https://www.ufc.tv/category/'
+ua              = 'Mozilla/5.0 (Linux; Android 6.0.1; D6603 Build/23.5.A.0.570; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/56.0.2924.87 Mobile Safari/537.36 android mobile ufc 7.0310'
 
 
 def get_creds():
@@ -23,8 +25,7 @@ def get_creds():
 
 def post_auth(creds):
     url = 'https://www.ufc.tv/page/fightpass' 
-    #ua = 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.87 Safari/537.36'
-    ua = 'Mozilla/5.0 (iPad; CPU OS 8_3 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Mobile/12F69'
+    #ua = 'Mozilla/5.0 (iPad; CPU OS 8_3 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Mobile/12F69'
 
     #TODO: create a common func to load a session with cookies already set
     #TODO: don't attempt to login unless we need to??
@@ -83,7 +84,7 @@ def publish_point(video):
     #  * in this case, we may need to re-auth, so we can play the video
     url = 'https://www.ufc.tv/service/publishpoint'
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0.1; D6603 Build/23.5.A.0.570; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/56.0.2924.87 Mobile Safari/537.36 android mobile ufc 6.1213'
+        'User-Agent': ua
     }
 
     payload = {
@@ -112,42 +113,29 @@ def publish_point(video):
 
 def get_categories():
     # Fetch the main UFC Fight Pass cat-a-ma-gories
-    url = 'https://www.ufc.tv/page/fightpass'
-    #ua = 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.87 Safari/537.36'
-    ua = 'Mozilla/5.0 (iPad; CPU OS 8_3 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Mobile/12F69'
-
+    url = c_base_url + 'fightpass?format=json'
     cj = cookielib.LWPCookieJar(COOKIE_FILE)
     try:
-        cj.load(COOKIE_FILE, ignore_discard=True)
+        cj.load(COOKIE_FILE, ignore_discard=False)
     except:
         pass
 
     headers = {
-        'User-Agent': 'Mozilla/5.0 (iPad; CPU OS 8_3 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Mobile/12F69'
+        'User-Agent': ua
     }
 
     s = requests.Session()
     s.cookies = cj
     resp = s.get(url, headers=headers, verify=True)
-    html = resp.text
+    data = resp.json()
 
     results = []
-    
-    soup = BeautifulSoup(html, 'html.parser')
-    
-    
-    for match in soup.findAll('a', {'class' : 'menu-link'}):
-        d = str(match['href'])
-        u = match['href']
-        
-        if 'ufc.tv' in d:
-        
-            c = {
-                'title': d.rsplit('/', 1)[-1],
-                'url' : u
-            }
-        
-            results.append(c)
+
+    for c in data['subCategories']:
+        results.append({
+            'title': c['name'],
+            'url': c_base_url +  c['seoName']
+        })
 
     return results
 
@@ -201,7 +189,8 @@ def build_menu(items):
             i_title = i['title']
 
         title = '[B][{0}][/B]  {1}'.format(i['airdate'], i_title) if not is_folder else i_title
-        item = xbmcgui.ListItem(label=title, thumbnailImage=thumb)   
+        item = xbmcgui.ListItem(label=title, thumbnailImage=thumb) 
+
         if is_folder:
             url = '{0}?action=traverse&u={1}&t={2}'.format(addon_url, i['url'], i_title)
         else:
@@ -217,8 +206,10 @@ def build_menu(items):
 
 
 def get_data(url):
+    url = url + '?format=json'
+    print('get_data() url: ' + url)
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.87 Safari/537.36'
+        'User-Agent': ua
     }
 
     cj = cookielib.LWPCookieJar(COOKIE_FILE)
@@ -232,67 +223,53 @@ def get_data(url):
     resp = s.get(url, headers=headers, verify=False)
     if not resp.status_code == 200:
         return None
-    return resp.content
+
+    return resp.json()
 
 
 def get_parsed_subs(data):
-    url = 'http://www.ufc.tv/category/'
-    # patch multiple class li tag returned from server -- IE: <li class="select" class="last">..</li>
-    # parser does not pick up both -- just the last class attr it sees
-    pattern = 'class=\"select\" class=\"last\"'
-    if re.compile(pattern).search(data):
-        data = re.sub(pattern, 'class=\"select\"', data)
+    #print('UFCFP: get_parsed_subs:')
+    #print(data)
+    # if we're at video depth, signal as such
+    if 'programs' in data.keys():
+        return []
 
-    soup  = BeautifulSoup(data)
-    lists = soup.find_all('ul', 'subMenuList')
-    lists[:] = [l for l in lists if not l.find('li', class_='select')]
+    subCategories = []
+    for sc in data['subCategories']:
+        subCategories.append({
+            'title': sc['name'], 
+            'url': c_base_url + sc['seoName']
+        })
 
-    s_list = []
+    return subCategories
 
-    if len(lists) > 0:
-        subs = lists[0].find_all('a') 
-        if len(subs) > 0:     
-            for sub in subs:
-                t = sub.get_text().encode('utf-8')
-                u = url + sub['href']
-                s_list.append({
-                    'title': t, 
-                    'url': u
-                })
-
-    return s_list
-
-
+    
 def get_parsed_vids(data):
-    soup = BeautifulSoup(data)
-    vids = soup.find_all('table', 'narrowDetail oneCol')
+    #print('UFCFP: get_parsed_vids:')
+    #print(data)
+    img_base_url = 'https://neulionmdnyc-a.akamaihd.net/u/ufc/thumbs/'
     v_list = []
-    if len(vids) > 0:     
-        for vid in vids:
-            i_src   = vid.find('img', 'thumbImg')['src']
-            v_id    = re.compile('(\d+)_').search(i_src).group(0)[:-1]
-            v_title = vid.find('a', 'txt name').get_text().encode('utf-8')
-            v_date  = vid.find('span', 'item first').get_text()
-            v_plot  = vid.find('div', 'txt desc').get_text().encode('utf-8')
-            v_thumb = i_src
-
-            v_list.append({
-                'id': v_id, 
-                'title': v_title, 
-                'thumb': v_thumb, 
-                'airdate': v_date, 
-                'plot': v_plot
-            })
-
+    for v in data['programs']:
+        v_list.append({
+            'id': v['id'], 
+            'title': v['name'], 
+            'thumb': img_base_url + v['image'], 
+            'airdate': datetime.datetime.strftime(parse_date(v['releaseDate'], '%Y-%m-%dT%H:%M:%S.%f'), '%Y-%m-%d'), 
+            'plot': v['description']
+        })
+            
     return v_list
+
+def parse_date(dateString, format='%Y-%m-%d %H:%M:%S.%f'):
+    try:
+        p_date = datetime.datetime.strptime(dateString, format)
+    except TypeError:
+        p_date = datetime.datetime.fromtimestamp(time.mktime(time.strptime(dateString, format)))
+    return p_date
 
 
 def needs_refresh(cache_date):
-    try:
-        p_date = datetime.datetime.strptime(cache_date, '%Y-%m-%d %H:%M:%S.%f')
-    except TypeError:
-        p_date = datetime.datetime.fromtimestamp(time.mktime(time.strptime(cache_date, '%Y-%m-%d %H:%M:%S.%f')))
-
+    p_date = parse_date(cache_date)
     delta = (datetime.datetime.now() - p_date).seconds / 60
     interval = addon.getSetting('cacheInterval')
     print 'UFCFP: Minutes elapsed since last cached: {0}. Set at: {1}.'.format(delta, interval)
