@@ -108,7 +108,9 @@ def publish_point(video):
     result = resp.json()
     if not result:
         return status, None
-    return status, result['path']
+
+    path = result['path'].replace('android', 'ipad')
+    return status, path
 
 
 def get_categories():
