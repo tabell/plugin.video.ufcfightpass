@@ -109,7 +109,7 @@ def publish_point(video):
     if not result:
         return status, None
 
-    path = result['path'].replace('android', 'ipad')
+    path = result['path'].replace('android', 'ced')
     return status, path
 
 
