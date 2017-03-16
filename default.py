@@ -68,7 +68,7 @@ def post_auth(creds):
 
     if auth_resp.code == 200:
         #TODO: need to handle login locked scenario as well
-        soup = BeautifulSoup(rdata)
+        soup = BeautifulSoup(rdata,"html.parser")
         code = soup.find('code').get_text()
         if code == 'loginsuccess':
             return True
