@@ -114,7 +114,7 @@ def publish_point(video):
 
 
 def get_categories():
-    # Fetch the main UFC Fight Pass cat-a-ma-gories
+    # Fetch the main UFC Fight Pass category menu data
     url = c_base_url + 'fightpass?format=json'
     cj = cookielib.LWPCookieJar(COOKIE_FILE)
     try:
@@ -136,8 +136,14 @@ def get_categories():
     for c in data['subCategories']:
         results.append({
             'title': c['name'],
-            'url': c_base_url +  c['seoName']
+            'url': c_base_url +  c['seoName'].replace('FIGHTPASS-LIVE-EVENTS', 'LIVE-EVENTS')
         })
+
+    # append the Just Added category as well
+    results.append({
+        'title': 'Just Added', 
+        'url': c_base_url + 'JUST-ADDED'
+    })
 
     return results
 
@@ -165,7 +171,6 @@ def main():
             create_free_menu()
         else:
             # fetch the main categories to start, and display the main menu
-            # TODO: add featured categories like: Trending on Fight Pass, Recent Events etc
             categories = get_categories()
             build_menu(categories)
 
@@ -209,7 +214,6 @@ def build_menu(items):
 
 def get_data(url):
     url = url + '?format=json'
-    print('get_data() url: ' + url)
     headers = {
         'User-Agent': ua
     }
@@ -230,8 +234,6 @@ def get_data(url):
 
 
 def get_parsed_subs(data):
-    #print('UFCFP: get_parsed_subs:')
-    #print(data)
     # if we're at video depth, signal as such
     if 'programs' in data.keys():
         return []
@@ -247,19 +249,30 @@ def get_parsed_subs(data):
 
     
 def get_parsed_vids(data):
-    #print('UFCFP: get_parsed_vids:')
-    #print(data)
     img_base_url = 'https://neulionmdnyc-a.akamaihd.net/u/ufc/thumbs/'
+    c_id = data['id']
     v_list = []
+
     for v in data['programs']:
+        v_date = 'Unknown'
+        v_name = v['name']
+
+        if 'releaseDate' in v.keys():
+            v_date = v['releaseDate']
+        else:
+            v_date  = v['beginDateTime']
+
+        if c_id == 389:
+            v_name  = '{0} - {1}'.format(v['programCode'], v['name'])
+
         v_list.append({
             'id': v['id'], 
-            'title': v['name'], 
+            'title': v_name, 
             'thumb': img_base_url + v['image'], 
-            'airdate': datetime.datetime.strftime(parse_date(v['releaseDate'], '%Y-%m-%dT%H:%M:%S.%f'), '%Y-%m-%d'), 
+            'airdate': datetime.datetime.strftime(parse_date(v_date, '%Y-%m-%dT%H:%M:%S.%f'), '%Y-%m-%d'), 
             'plot': v['description']
         })
-            
+          
     return v_list
 
 def parse_date(dateString, format='%Y-%m-%d %H:%M:%S.%f'):
@@ -309,7 +322,6 @@ def traverse(url):
                 'data': items, 
                 'lastCached': str(datetime.datetime.now())
             })
-            # TODO: sort??
 
     build_menu(items)
 
