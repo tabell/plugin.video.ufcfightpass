@@ -167,17 +167,17 @@ def main():
             # fetch the main categories to start, and display the main menu
             # TODO: add featured categories like: Trending on Fight Pass, Recent Events etc
             categories = get_categories()
-            build_menu(categories)
+            build_menu(categories,True)
 
 
 def create_free_menu():
     # TODO: this should load / save to cache as well? Refactor needed.
     data = get_data('http://www.ufc.tv/category/free-video')
     vids = get_parsed_vids(data)
-    build_menu(vids)
+    build_menu(vids,False)
 
 
-def build_menu(items):
+def build_menu(items,toplevel):
     listing = []
     first = items[0]
     is_folder = 'id' not in first.keys()
@@ -199,6 +199,9 @@ def build_menu(items):
             url = '{0}?action=play&i={1}&t={2}'.format(addon_url, i['id'], i_title)
 
         listing.append((url, item, is_folder))
+    if (toplevel == True):
+        url = '{0}?action=search&u={1}&t={2}'.format(addon_url,'UFC 27' , 'Search: UFC 27')
+        listing.append((url,xbmcgui.ListItem(label='Search',thumbnailImage=None),True))
 
     if len(listing) > 0:
         xbmcplugin.addDirectoryItems(addon_handle, listing, len(listing))
@@ -208,7 +211,8 @@ def build_menu(items):
 
 
 def get_data(url):
-    url = url + '?format=json'
+    if 'json' not in url:
+        url = url + '?format=json'
     print('get_data() url: ' + url)
     headers = {
         'User-Agent': ua
@@ -296,6 +300,12 @@ def traverse(url):
             dialog = xbmcgui.Dialog()
             dialog.ok('Error', 'Unable to load content. Check log for more details.')
 
+        if data['paging']:
+            if data['paging']['count'] == 0: # if we did a search we might get empty results
+                dialog = xbmcgui.Dialog()
+                dialog.ok('Error', 'No results found')
+                return []
+
         items = get_parsed_subs(data)
         save_cacheItem(url, {
             'data': items, 
@@ -311,7 +321,7 @@ def traverse(url):
             })
             # TODO: sort??
 
-    build_menu(items)
+    build_menu(items,False)
 
 
 def play_video(v_id, v_title):
@@ -346,6 +356,12 @@ def router(paramstring):
             play_video(params['i'], params['t'])
         elif action == 'traverse':
             traverse(params['u'])
+        elif action == 'search':
+            keyboard = xbmc.Keyboard()
+            keyboard.doModal()
+            if keyboard.isConfirmed() and keyboard.getText():
+                query = keyboard.getText()
+                traverse('https://www.ufc.tv/search?param={}&format=json'.format(query))
     else:
         main()
 
