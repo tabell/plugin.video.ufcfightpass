@@ -1,4 +1,4 @@
 # plugin.video.ufcfightpass
-UFC Fightpass
+Subscription based access to UFC Fight Pass for Kodi
 
-portse's http://forum.kodi.tv/showthread.php?tid=213642
+http://forum.kodi.tv/showthread.php?tid=213642
