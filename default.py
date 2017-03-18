@@ -252,7 +252,6 @@ def get_parsed_vids(data):
         return []
 
     img_base_url = 'https://neulionmdnyc-a.akamaihd.net/u/ufc/thumbs/'
-    c_id = data['id']
     v_list = []
 
     for v in data['programs']:
