@@ -194,7 +194,11 @@ def build_menu(items):
         except:
             i_title = i['title']
 
-        title = '[B][{0}][/B]  {1}'.format(i['airdate'], i_title) if not is_folder else i_title
+        live_state = ''
+        if 'isLive' in i and i['isLive'] == 1:
+            live_state = ' - [COLOR green]LIVE NOW[/COLOR]'
+
+        title = '[B][{0}{1}][/B]  {2}'.format(i['airdate'], live_state, i_title) if not is_folder else i_title
         item = xbmcgui.ListItem(label=title, thumbnailImage=thumb) 
 
         if is_folder:
@@ -253,7 +257,7 @@ def get_parsed_vids(data):
 
     img_base_url = 'https://neulionmdnyc-a.akamaihd.net/u/ufc/thumbs/'
     v_list = []
-
+    
     for v in data['programs']:
 
         if 'beginDateTime' in v:
@@ -266,7 +270,8 @@ def get_parsed_vids(data):
             'title': get_title(v), 
             'thumb': img_base_url + v['image'], 
             'airdate': datetime.datetime.strftime(parse_date(v_date, '%Y-%m-%dT%H:%M:%S.%f'), '%Y-%m-%d'), 
-            'plot': v['description']
+            'plot': v['description'], 
+            'isLive': v['liveState'] if 'liveState' in v else 0
         })
           
     return v_list
