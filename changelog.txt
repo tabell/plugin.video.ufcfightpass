@@ -1,6 +1,12 @@
+[B]Version 1.0.0[/B]
+
+- Fix Live Events menu
+- Add 'Just Added' menu
+
 [B]Version 0.9.2[/B]
 
 - Fix fight library menu loading mechanism
+- Add support for HD (720p) streams (credit: mayofreak)
 
 [B]Version 0.9.1[/B]
 
