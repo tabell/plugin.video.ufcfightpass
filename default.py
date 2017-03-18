@@ -176,7 +176,6 @@ def main():
 
 
 def create_free_menu():
-    # TODO: this should load / save to cache as well? Refactor needed.
     data = get_data('http://www.ufc.tv/category/free-video')
     vids = get_parsed_vids(data)
     build_menu(vids)
@@ -185,7 +184,7 @@ def create_free_menu():
 def build_menu(items):
     listing = []
     first = items[0]
-    is_folder = 'id' not in first.keys()
+    is_folder = 'id' not in first
 
     for i in items:
         thumb = i['thumb'] if not is_folder else None
@@ -235,7 +234,7 @@ def get_data(url):
 
 def get_parsed_subs(data):
     # if we're at video depth, signal as such
-    if 'programs' in data.keys():
+    if 'programs' in data or 'subCategories' not in data:
         return []
 
     subCategories = []
@@ -249,31 +248,39 @@ def get_parsed_subs(data):
 
     
 def get_parsed_vids(data):
+    if 'programs' not in data:
+        return []
+
     img_base_url = 'https://neulionmdnyc-a.akamaihd.net/u/ufc/thumbs/'
     c_id = data['id']
     v_list = []
 
     for v in data['programs']:
-        v_date = 'Unknown'
-        v_name = v['name']
 
-        if 'releaseDate' in v.keys():
-            v_date = v['releaseDate']
+        if 'beginDateTime' in v:
+            v_date = v['beginDateTime']
         else:
-            v_date  = v['beginDateTime']
-
-        if c_id == 389:
-            v_name  = '{0} - {1}'.format(v['programCode'], v['name'])
+            v_date  = v['releaseDate']
 
         v_list.append({
             'id': v['id'], 
-            'title': v_name, 
+            'title': get_title(v), 
             'thumb': img_base_url + v['image'], 
             'airdate': datetime.datetime.strftime(parse_date(v_date, '%Y-%m-%dT%H:%M:%S.%f'), '%Y-%m-%d'), 
             'plot': v['description']
         })
           
     return v_list
+
+
+def get_title(program):
+    name  = program['name'].encode('utf-8')
+    if 'programCode' in program and program['programCode'].strip():
+        pcode = program['programCode'].encode('utf-8')
+        return '{0} - {1}'.format(pcode, name)
+    else:
+        return name
+
 
 def parse_date(dateString, format='%Y-%m-%d %H:%M:%S.%f'):
     try:
@@ -308,20 +315,23 @@ def traverse(url):
             print('UFCFP get_data() returned no data')
             dialog = xbmcgui.Dialog()
             dialog.ok('Error', 'Unable to load content. Check log for more details.')
+            return
 
         items = get_parsed_subs(data)
-        save_cacheItem(url, {
-            'data': items, 
-            'lastCached': str(datetime.datetime.now())
-        })
 
         if len(items) == 0:
             # no sub categories, so we're likely at video list depth
             items = get_parsed_vids(data)
-            save_cacheItem(url, {
-                'data': items, 
-                'lastCached': str(datetime.datetime.now())
-            })
+            if len(items) == 0:
+                dialog = xbmcgui.Dialog()
+                dialog.ok('No content', 'No content found.')
+                return
+
+        # save the sub-category or video list data to cache
+        save_cacheItem(url, {
+            'data': items, 
+            'lastCached': str(datetime.datetime.now())
+        })
 
     build_menu(items)
 
