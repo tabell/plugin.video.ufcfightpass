@@ -200,7 +200,7 @@ def build_menu(items):
 
         if is_folder and 'Live Events' in i_title:
             live_count = get_live_count()
-            title = '{0} [B][COLOR green]({1})[/COLOR][/B]'.format(i_title, get_live_count()) if live_count > 0 else i_title
+            title = '{0} [B][COLOR green]({1})[/COLOR][/B]'.format(i_title, live_count) if live_count > 0 else i_title
         else:
             title = '[B][{0}{1}][/B]  {2}'.format(i['airdate'], live_state, i_title) if not is_folder else i_title
         
@@ -217,7 +217,7 @@ def build_menu(items):
         xbmcplugin.addDirectoryItems(addon_handle, listing, len(listing))
         # force thumbnail view mode??
         #xbmc.executebuiltin('Container.SetViewMode(500)')
-        xbmcplugin.endOfDirectory(addon_handle)
+        xbmcplugin.endOfDirectory(addon_handle, cacheToDisc=False)
 
 
 def get_data(url):
