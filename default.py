@@ -306,7 +306,11 @@ def traverse(url):
     print("UFCFP: Traversing categories for URL: " + url)
     # check / load from cache if available and prior to next refresh interval
     items  = None
-    cached = get_cacheItem(url)
+    cached = None
+
+    if should_cache(url):
+        cached = get_cacheItem(url)
+
     if cached and not needs_refresh(cached['lastCached']):
         items = cached['data']
         print('UFCFP: Using cached data..')
@@ -332,12 +336,19 @@ def traverse(url):
                 return
 
         # save the sub-category or video list data to cache
-        save_cacheItem(url, {
-            'data': items, 
-            'lastCached': str(datetime.datetime.now())
-        })
+        if should_cache(url):
+            save_cacheItem(url, {
+                'data': items, 
+                'lastCached': str(datetime.datetime.now())
+            })
 
     build_menu(items)
+
+
+def should_cache(url):
+    if 'LIVE-EVENTS' in url or 'JUST-ADDED' in url:
+        return False
+    return True
 
 
 def play_video(v_id, v_title):
