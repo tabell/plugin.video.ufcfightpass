@@ -198,7 +198,12 @@ def build_menu(items):
         if 'isLive' in i and i['isLive'] == 1:
             live_state = ' - [COLOR green]LIVE NOW[/COLOR]'
 
-        title = '[B][{0}{1}][/B]  {2}'.format(i['airdate'], live_state, i_title) if not is_folder else i_title
+        if is_folder and 'Live Events' in i_title:
+            live_count = get_live_count()
+            title = '{0} [B][COLOR green]({1})[/COLOR][/B]'.format(i_title, get_live_count()) if live_count > 0 else i_title
+        else:
+            title = '[B][{0}{1}][/B]  {2}'.format(i['airdate'], live_state, i_title) if not is_folder else i_title
+        
         item = xbmcgui.ListItem(label=title, thumbnailImage=thumb) 
 
         if is_folder:
@@ -284,6 +289,14 @@ def get_title(program):
         return '{0} - {1}'.format(pcode, name)
     else:
         return name
+
+
+def get_live_count():
+    try:
+        data = get_data(c_base_url + 'LIVE-EVENTS')
+        return sum(1 for i in data['programs'] if 'liveState' in i and i['liveState'] == 1)
+    except:
+        return 0
 
 
 def parse_date(dateString, format='%Y-%m-%d %H:%M:%S.%f'):
