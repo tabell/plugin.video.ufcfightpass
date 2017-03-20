@@ -136,13 +136,15 @@ def get_categories():
     for c in data['subCategories']:
         results.append({
             'title': c['name'],
-            'url': c_base_url +  c['seoName'].replace('FIGHTPASS-LIVE-EVENTS', 'LIVE-EVENTS')
+            'url': c_base_url +  c['seoName'].replace('FIGHTPASS-LIVE-EVENTS', 'LIVE-EVENTS'),
+            'level': 'top'
         })
 
     # append the Just Added category as well
     results.append({
         'title': 'Just Added', 
-        'url': c_base_url + 'JUST-ADDED'
+        'url': c_base_url + 'JUST-ADDED', 
+        'level': 'top'
     })
 
     return results
@@ -185,6 +187,7 @@ def build_menu(items):
     listing = []
     first = items[0]
     is_folder = 'id' not in first
+    is_top_level = 'level' in first
 
     for i in items:
         thumb = i['thumb'] if not is_folder else None
@@ -213,6 +216,11 @@ def build_menu(items):
 
         listing.append((url, item, is_folder))
 
+    if is_top_level:
+        # append My Queue menu item - refactor to allow pulling other single action based options like search
+        item = xbmcgui.ListItem(label='My Queue') 
+        listing.append(('{0}?action=queue'.format(addon_url), item, True))
+
     if len(listing) > 0:
         xbmcplugin.addDirectoryItems(addon_handle, listing, len(listing))
         # force thumbnail view mode??
@@ -220,8 +228,12 @@ def build_menu(items):
         xbmcplugin.endOfDirectory(addon_handle, cacheToDisc=False)
 
 
-def get_data(url):
-    url = url + '?format=json'
+def get_data(url, params=None):
+    if params is None:
+        params = {
+            'format': 'json'
+        }
+
     headers = {
         'User-Agent': ua
     }
@@ -234,7 +246,27 @@ def get_data(url):
 
     s = requests.Session()
     s.cookies = cj
-    resp = s.get(url, headers=headers, verify=False)
+    resp = s.get(url, headers=headers, params=params, verify=False)
+    if not resp.status_code == 200:
+        return None
+
+    return resp.json()
+
+# refactor to consolidate common api client code..
+def post_data(url, payload):
+    headers = {
+        'User-Agent': ua
+    }
+
+    cj = cookielib.LWPCookieJar(COOKIE_FILE)
+    try:
+        cj.load(COOKIE_FILE, ignore_discard=True)
+    except:
+        pass
+
+    s = requests.Session()
+    s.cookies = cj
+    resp = s.post(url, data=payload, headers=headers, verify=True)
     if not resp.status_code == 200:
         return None
 
@@ -297,6 +329,49 @@ def get_live_count():
         return sum(1 for i in data['programs'] if 'liveState' in i and i['liveState'] == 1)
     except:
         return 0
+
+
+def load_queue():
+    token = get_accessToken()
+    if token:
+        queued = get_queued(token)
+    else:
+        queued = []
+
+    if len(queued) > 0:
+        build_menu(queued)
+    else:
+        dialog = xbmcgui.Dialog()
+        dialog.ok('No content', 'No queued content found.')
+
+
+def get_accessToken():
+    payload = {
+        'format': 'json'
+    }
+    data = post_data('https://www.ufc.tv/secure/accesstoken', payload)
+    if data:
+        return data['data']['accessToken']
+    return None
+
+
+def get_queued(accessToken):
+    url = 'https://apis.neulion.com/personalization_ufc/v1/playlist/get'
+    q_data = get_data(url, params={
+        'token': accessToken
+    })
+
+    q_ids = [q['id'] for q in q_data['contents']]
+
+    if len(q_ids) > 0:
+        ids = ','.join(q_ids)
+        results = get_data('https://ufc.tv/service/programs', params={
+            'ids': ids,
+            'format': 'json'
+        })
+        return get_parsed_vids(results)
+
+    return []
 
 
 def parse_date(dateString, format='%Y-%m-%d %H:%M:%S.%f'):
@@ -396,6 +471,8 @@ def router(paramstring):
             play_video(params['i'], params['t'])
         elif action == 'traverse':
             traverse(params['u'])
+        elif action == 'queue':
+            load_queue()
     else:
         main()
 
