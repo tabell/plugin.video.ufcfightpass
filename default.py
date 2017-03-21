@@ -350,7 +350,7 @@ def get_accessToken():
         'format': 'json'
     }
     data = post_data('https://www.ufc.tv/secure/accesstoken', payload)
-    if data:
+    if data and 'accessToken' in data['data']:
         return data['data']['accessToken']
     return None
 
@@ -361,15 +361,25 @@ def get_queued(accessToken):
         'token': accessToken
     })
 
-    q_ids = [q['id'] for q in q_data['contents']]
+    if 'result' in q_data and q_data['result'] == 'unauthorized': # status from this API still 200??
+        # we need to re-auth and update token
+        if post_auth(get_creds()):
+            accessToken = get_accessToken()
+            if accessToken:
+                q_data = get_data(url, params={
+                    'token': accessToken
+                })
 
-    if len(q_ids) > 0:
-        ids = ','.join(q_ids)
-        results = get_data('https://ufc.tv/service/programs', params={
-            'ids': ids,
-            'format': 'json'
-        })
-        return get_parsed_vids(results)
+    if 'contents' in q_data:
+        q_ids = [q['id'] for q in q_data['contents']]
+
+        if len(q_ids) > 0:
+            ids = ','.join(q_ids)
+            results = get_data('https://ufc.tv/service/programs', params={
+                'ids': ids,
+                'format': 'json'
+            })
+            return get_parsed_vids(results)
 
     return []
 
