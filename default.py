@@ -213,6 +213,10 @@ def build_menu(items):
             url = '{0}?action=traverse&u={1}&t={2}'.format(addon_url, i['url'], i_title)
         else:
             url = '{0}?action=play&i={1}&t={2}'.format(addon_url, i['id'], i_title)
+            # generate appropriate context menu
+            ctx = get_ctx_items(i)
+            if len(ctx) > 0:
+                item.addContextMenuItems(get_ctx_items(i), replaceItems=True)
 
         listing.append((url, item, is_folder))
 
@@ -226,6 +230,18 @@ def build_menu(items):
         # force thumbnail view mode??
         #xbmc.executebuiltin('Container.SetViewMode(500)')
         xbmcplugin.endOfDirectory(addon_handle, cacheToDisc=False)
+
+
+def get_ctx_items(item):
+    ctx = []
+    params = dict(parse_qsl(sys.argv[2][1:]))
+    if params and params['action'] == 'queue':
+        ctx_path = '{0}?action=queueDel&i={1}'.format(addon_url, item['id'])
+        ctx.append(('Remove from My Queue', 'XBMC.RunPlugin({0})'.format(ctx_path)))
+    else:
+        ctx_path = '{0}?action=queueSet&i={1}'.format(addon_url, item['id'])
+        ctx.append(('Add to My Queue', 'XBMC.RunPlugin({0})'.format(ctx_path)))
+    return ctx
 
 
 def get_data(url, params=None):
@@ -334,7 +350,7 @@ def get_live_count():
 def load_queue():
     token = get_accessToken()
     if token:
-        queued = get_queued(token)
+        queued = queue_get(token)
     else:
         queued = []
 
@@ -355,7 +371,7 @@ def get_accessToken():
     return None
 
 
-def get_queued(accessToken):
+def queue_get(accessToken):
     url = 'https://apis.neulion.com/personalization_ufc/v1/playlist/get'
     q_data = get_data(url, params={
         'token': accessToken
@@ -382,6 +398,48 @@ def get_queued(accessToken):
             return get_parsed_vids(results)
 
     return []
+
+#todo: refactor / consolidate common queue code
+def queue_set(id):
+    token = get_accessToken()
+    resp = None
+    if token:
+        url = 'https://apis.neulion.com/personalization_ufc/v1/playlist/set'
+        params = {
+            'type': 'program', 
+            'id': id,
+            'token': token
+        }
+        resp = get_data(url, params=params)
+
+    dialog = xbmcgui.Dialog()
+
+    if 'result' in resp and resp['result'] == 'success':  
+        dialog.ok('Queue Video', 'Video added to queue.')
+    else:
+        dialog.ok('Queue Video', 'Unable to add video to queue.')
+
+
+def queue_del(id):
+    token = get_accessToken()
+    resp = None
+    if token:
+        url = 'https://apis.neulion.com/personalization_ufc/v1/playlist/delete'
+        params = {
+            'type': 'program', 
+            'id': id,
+            'token': token
+        }
+        resp = get_data(url, params=params)
+
+    dialog = xbmcgui.Dialog()
+
+    if 'result' in resp and resp['result'] == 'success':
+        dialog.ok('My Queue', 'Video removed from queue.')
+    else:
+        dialog.ok('My Queue', 'Unable to remove video from queue.')
+
+    xbmc.executebuiltin('Container.Refresh') 
 
 
 def parse_date(dateString, format='%Y-%m-%d %H:%M:%S.%f'):
@@ -483,6 +541,10 @@ def router(paramstring):
             traverse(params['u'])
         elif action == 'queue':
             load_queue()
+        elif action == 'queueSet':
+            queue_set(params['i'])
+        elif action == "queueDel":
+            queue_del(params['i'])
     else:
         main()
 
