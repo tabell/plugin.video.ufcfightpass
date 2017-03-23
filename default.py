@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 addon           = xbmcaddon.Addon(id='plugin.video.ufcfightpass')
 addon_url       = sys.argv[0]
 addon_handle    = int(sys.argv[1])
+addon_icon      = addon.getAddonInfo('icon')
 addon_BASE_PATH = xbmc.translatePath(xbmcaddon.Addon().getAddonInfo('profile'))
 COOKIE_FILE     = os.path.join(addon_BASE_PATH, 'cookies.lwp')
 CACHE_FILE      = os.path.join(addon_BASE_PATH, 'data.json')
@@ -238,6 +239,7 @@ def get_ctx_items(item):
     if params and params['action'] == 'queue':
         ctx_path = '{0}?action=queueDel&i={1}'.format(addon_url, item['id'])
         ctx.append(('Remove from My Queue', 'XBMC.RunPlugin({0})'.format(ctx_path)))
+        ctx.append(('Refresh My Queue', 'Container.Refresh'))
     else:
         ctx_path = '{0}?action=queueSet&i={1}'.format(addon_url, item['id'])
         ctx.append(('Add to My Queue', 'XBMC.RunPlugin({0})'.format(ctx_path)))
@@ -372,20 +374,7 @@ def get_accessToken():
 
 
 def queue_get(accessToken):
-    url = 'https://apis.neulion.com/personalization_ufc/v1/playlist/get'
-    q_data = get_data(url, params={
-        'token': accessToken
-    })
-
-    if 'result' in q_data and q_data['result'] == 'unauthorized': # status from this API still 200??
-        # we need to re-auth and update token
-        if post_auth(get_creds()):
-            accessToken = get_accessToken()
-            if accessToken:
-                q_data = get_data(url, params={
-                    'token': accessToken
-                })
-
+    q_data = get_pers('https://apis.neulion.com/personalization_ufc/v1/playlist/get')
     if 'contents' in q_data:
         q_ids = [q['id'] for q in q_data['contents']]
 
@@ -399,47 +388,45 @@ def queue_get(accessToken):
 
     return []
 
-#todo: refactor / consolidate common queue code
-def queue_set(id):
+
+def get_pers(url, pid=None, ptype=None, count=0):
     token = get_accessToken()
-    resp = None
-    if token:
-        url = 'https://apis.neulion.com/personalization_ufc/v1/playlist/set'
-        params = {
-            'type': 'program', 
-            'id': id,
-            'token': token
-        }
-        resp = get_data(url, params=params)
+    params = {
+        'token': token
+    }
 
-    dialog = xbmcgui.Dialog()
+    if pid and ptype:
+        params['id'] = pid
+        params['type'] = ptype
+        
+    data = get_data(url, params=params)
 
-    if 'result' in resp and resp['result'] == 'success':  
-        dialog.ok('Queue Video', 'Video added to queue.')
+    if 'result' in data and data['result'] == 'unauthorized': # status still 200??
+        if count < 3:  # allow 3 retries on failure before bailing
+            # we need to re-auth and update token
+            print('UFCFP: get_pers re-auth for token (retry %s/3)' %(count+1))
+            if post_auth(get_creds()):
+                return get_pers(url, pid, ptype, (count+1))
+        else:
+            return None
+
+    return data
+
+
+def queue_set(id):
+    resp = get_pers('https://apis.neulion.com/personalization_ufc/v1/playlist/set', id, 'program')
+    if 'result' in resp and resp['result'] == 'success': 
+        notify('Success', 'Video added to queue')
     else:
-        dialog.ok('Queue Video', 'Unable to add video to queue.')
+        notify('Error', 'Unable to add video to queue')
 
 
 def queue_del(id):
-    token = get_accessToken()
-    resp = None
-    if token:
-        url = 'https://apis.neulion.com/personalization_ufc/v1/playlist/delete'
-        params = {
-            'type': 'program', 
-            'id': id,
-            'token': token
-        }
-        resp = get_data(url, params=params)
-
-    dialog = xbmcgui.Dialog()
-
+    resp = get_pers('https://apis.neulion.com/personalization_ufc/v1/playlist/delete', id, 'program')
     if 'result' in resp and resp['result'] == 'success':
-        dialog.ok('My Queue', 'Video removed from queue.')
+        xbmc.executebuiltin('Container.Refresh') 
     else:
-        dialog.ok('My Queue', 'Unable to remove video from queue.')
-
-    xbmc.executebuiltin('Container.Refresh') 
+        notify('Error', 'Unable to remove video from queue')
 
 
 def parse_date(dateString, format='%Y-%m-%d %H:%M:%S.%f'):
@@ -548,6 +535,8 @@ def router(paramstring):
     else:
         main()
 
+def notify(header, msg, wait=4000, icon=addon_icon):
+    xbmc.executebuiltin('Notification(%s,%s,%s,%s)' %(header, msg, wait, icon))
 
 
 # data caching layer -- should move this into another class..
