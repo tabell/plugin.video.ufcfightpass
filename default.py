@@ -359,8 +359,7 @@ def load_queue():
     if len(queued) > 0:
         build_menu(queued)
     else:
-        dialog = xbmcgui.Dialog()
-        dialog.ok('No content', 'No queued content found.')
+        xbmcplugin.endOfDirectory(addon_handle, cacheToDisc=False)
 
 
 def get_accessToken():
@@ -535,7 +534,7 @@ def router(paramstring):
     else:
         main()
 
-def notify(header, msg, wait=4000, icon=addon_icon):
+def notify(header, msg, wait=3000, icon=addon_icon):
     xbmc.executebuiltin('Notification(%s,%s,%s,%s)' %(header, msg, wait, icon))
 
 
