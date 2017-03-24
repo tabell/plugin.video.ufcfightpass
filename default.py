@@ -26,10 +26,6 @@ def get_creds():
 
 def post_auth(creds):
     url = 'https://www.ufc.tv/page/fightpass' 
-    #ua = 'Mozilla/5.0 (iPad; CPU OS 8_3 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Mobile/12F69'
-
-    #TODO: create a common func to load a session with cookies already set
-    #TODO: don't attempt to login unless we need to??
     cj = cookielib.LWPCookieJar(COOKIE_FILE)
     try:
         cj.load()
@@ -228,8 +224,6 @@ def build_menu(items):
 
     if len(listing) > 0:
         xbmcplugin.addDirectoryItems(addon_handle, listing, len(listing))
-        # force thumbnail view mode??
-        #xbmc.executebuiltin('Container.SetViewMode(500)')
         xbmcplugin.endOfDirectory(addon_handle, cacheToDisc=False)
 
 
@@ -350,12 +344,7 @@ def get_live_count():
 
 
 def load_queue():
-    token = get_accessToken()
-    if token:
-        queued = queue_get(token)
-    else:
-        queued = []
-
+    queued = queue_get()
     if len(queued) > 0:
         build_menu(queued)
     else:
@@ -372,7 +361,7 @@ def get_accessToken():
     return None
 
 
-def queue_get(accessToken):
+def queue_get():
     q_data = get_pers('https://apis.neulion.com/personalization_ufc/v1/playlist/get')
     if 'contents' in q_data:
         q_ids = [q['id'] for q in q_data['contents']]
