@@ -1,3 +1,8 @@
+[B]Version 1.1.0[/B]
+
+- Add Live Event status indicator (identify which events are currently live)
+- Add 'My Queue' feature
+
 [B]Version 1.0.0[/B]
 
 - Fix Live Events menu
