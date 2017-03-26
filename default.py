@@ -207,7 +207,7 @@ def build_menu(itemData):
         else:
             title = '[B][{0}{1}][/B]  {2}'.format(i['airdate'], live_state, i_title) if not is_folder else i_title
         
-        item = xbmcgui.ListItem(label=title, thumbnailImage=thumb) 
+        item = xbmcgui.ListItem(label=title, thumbnailImage=thumb)
 
         if is_folder:
             url = '{0}?action=traverse&u={1}&t={2}'.format(addon_url, i['url'], i_title)
@@ -225,16 +225,28 @@ def build_menu(itemData):
         item = xbmcgui.ListItem(label='My Queue') 
         listing.append(('{0}?action=queue'.format(addon_url), item, True))
 
+    # generate paging navigation
     if 'paging' in itemData and itemData['paging']:
-        # refactor to calc / return next page item easily
-        item = xbmcgui.ListItem(label='[B][I]Next Page..[/I][/B]')
-        params = dict(parse_qsl(sys.argv[2][1:]))
-        pn = int(itemData['paging']['pageNumber'])
-        listing.append(('{0}?action=traverse&u={1}&pn={2}'.format(addon_url, params['u'], pn+1), item, True))
+        pg_items = get_paging(itemData['paging'])
+        if len(pg_items) > 0:
+            listing.extend(pg_items)
 
     if len(listing) > 0:
         xbmcplugin.addDirectoryItems(addon_handle, listing, len(listing))
         xbmcplugin.endOfDirectory(addon_handle, cacheToDisc=False)
+
+
+def get_paging(pagingData):
+    items = []
+    pn = int(pagingData['pageNumber'])
+    tp = int(pagingData['totalPages'])
+    url = dict(parse_qsl(sys.argv[2][1:]))['u']
+    if pn < tp:
+        # next
+        item = xbmcgui.ListItem(label='[B][I]Page: %s of %s[/I][/B]. Next >' %(pn, tp))
+        items.append(('{0}?action=traverse&u={1}&pn={2}'.format(addon_url, url, pn+1), item, True))
+        return items
+    return []
 
 
 def get_ctx_items(item):
