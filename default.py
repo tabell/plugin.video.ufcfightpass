@@ -144,7 +144,10 @@ def get_categories():
         'level': 'top'
     })
 
-    return results
+    return {
+        'paging': None,
+        'items': results
+    }
 
 
 def main():
@@ -180,13 +183,13 @@ def create_free_menu():
     build_menu(vids)
 
 
-def build_menu(items):
+def build_menu(itemData):
     listing = []
-    first = items[0]
+    first = itemData['items'][0]
     is_folder = 'id' not in first
     is_top_level = 'level' in first
 
-    for i in items:
+    for i in itemData['items']:
         thumb = i['thumb'] if not is_folder else None
         # stupid encoding hack for now..
         try:
@@ -221,6 +224,13 @@ def build_menu(items):
         # append My Queue menu item - refactor to allow pulling other single action based options like search
         item = xbmcgui.ListItem(label='My Queue') 
         listing.append(('{0}?action=queue'.format(addon_url), item, True))
+
+    if 'paging' in itemData and itemData['paging']:
+        # refactor to calc / return next page item easily
+        item = xbmcgui.ListItem(label='[B][I]Next Page..[/I][/B]')
+        params = dict(parse_qsl(sys.argv[2][1:]))
+        pn = int(itemData['paging']['pageNumber'])
+        listing.append(('{0}?action=traverse&u={1}&pn={2}'.format(addon_url, params['u'], pn+1), item, True))
 
     if len(listing) > 0:
         xbmcplugin.addDirectoryItems(addon_handle, listing, len(listing))
@@ -297,7 +307,10 @@ def get_parsed_subs(data):
             'url': c_base_url + sc['seoName']
         })
 
-    return subCategories
+    return {
+        'paging': None, 
+        'items': subCategories
+    }
 
     
 def get_parsed_vids(data):
@@ -322,8 +335,11 @@ def get_parsed_vids(data):
             'plot': v['description'], 
             'isLive': v['liveState'] if 'liveState' in v else 0
         })
-          
-    return v_list
+      
+    return {
+        'paging': data['paging'] or None,
+        'items': v_list
+    }
 
 
 def get_title(program):
@@ -433,14 +449,15 @@ def needs_refresh(cache_date):
     return delta >= int(interval)
 
 
-def traverse(url):
-    print("UFCFP: Traversing categories for URL: " + url)
+def traverse(url, pn=None):
+    p_url = url + '/%s' %(pn) if pn else url
+    print("UFCFP: Traversing categories for URL: " + p_url)
     # check / load from cache if available and prior to next refresh interval
     items  = None
     cached = None
 
-    if should_cache(url):
-        cached = get_cacheItem(url)
+    if should_cache(p_url):
+        cached = get_cacheItem(p_url)
 
     if cached and not needs_refresh(cached['lastCached']):
         items = cached['data']
@@ -448,7 +465,15 @@ def traverse(url):
 
     else:
         print('UFCFP: No cached data. Fetching new data..')
-        data = get_data(url)
+        params = None
+        if pn:
+            params = {
+                'format': 'json', 
+                'pn': pn
+            }
+
+        data = get_data(url, params)
+
         if not data:
             # ideally, we need to throw an error here, because we received no data from the server
             print('UFCFP get_data() returned no data')
@@ -467,9 +492,9 @@ def traverse(url):
                 return
 
         # save the sub-category or video list data to cache
-        if should_cache(url):
-            save_cacheItem(url, {
-                'data': items, 
+        if should_cache(p_url):
+            save_cacheItem(p_url, {
+                'data': items,
                 'lastCached': str(datetime.datetime.now())
             })
 
@@ -513,7 +538,10 @@ def router(paramstring):
         elif action == 'play':
             play_video(params['i'], params['t'])
         elif action == 'traverse':
-            traverse(params['u'])
+            pn = None
+            if 'pn' in params:
+                pn = params['pn']
+            traverse(params['u'], pn)
         elif action == 'queue':
             load_queue()
         elif action == 'queueSet':
