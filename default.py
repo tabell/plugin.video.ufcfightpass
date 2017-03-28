@@ -243,8 +243,11 @@ def get_paging(pagingData):
     url = dict(parse_qsl(sys.argv[2][1:]))['u']
     if pn < tp:
         # next
-        item = xbmcgui.ListItem(label='[B][I]Page: %s of %s[/I][/B]. Next >' %(pn, tp))
+        item = xbmcgui.ListItem(label='[B]- [I]Page %s of %s[/I] - Next Page[/B] >' %(pn, tp))
         items.append(('{0}?action=traverse&u={1}&pn={2}'.format(addon_url, url, pn+1), item, True))
+        # goto page
+        #item = xbmcgui.ListItem(label='[B][I]Goto Page..[/I][/B]')
+        #items.append(('{0}?action=goto_pn&u={1}&c={2}&m={3}'.format(addon_url, url, pn, tp), item, True))
         return items
     return []
 
@@ -349,7 +352,7 @@ def get_parsed_vids(data):
         })
       
     return {
-        'paging': data['paging'] or None,
+        'paging': data['paging'] if 'paging' in data else None,
         'items': v_list
     }
 
@@ -443,6 +446,18 @@ def queue_del(id):
         xbmc.executebuiltin('Container.Refresh') 
     else:
         notify('Error', 'Unable to remove video from queue')
+
+
+def goto_page(url, curr_pn, max_pn):
+    pn = 0
+    input_pn = xbmcgui.Dialog().numeric(0, 'Go to page number:')
+    if input_pn:
+        pn = int(input_pn)
+    if pn > 0 and pn <= max_pn:
+        traverse(url, pn)
+    else:
+        xbmcgui.Dialog().ok('Error', 'Invalid page selected. Returning to page %s.' %(curr_pn))
+        traverse(url, curr_pn)
 
 
 def parse_date(dateString, format='%Y-%m-%d %H:%M:%S.%f'):
@@ -558,8 +573,11 @@ def router(paramstring):
             load_queue()
         elif action == 'queueSet':
             queue_set(params['i'])
-        elif action == "queueDel":
+        elif action == 'queueDel':
             queue_del(params['i'])
+        elif action == 'goto_pn':
+            goto_page(params['u'], params['c'], params['m'])
+
     else:
         main()
 
