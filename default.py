@@ -99,7 +99,7 @@ def publish_point(video):
 
     s = requests.Session()
     s.cookies = cj
-    resp = s.post(url, data=payload, headers=headers, verify=False)
+    resp = s.post(url, data=payload, headers=headers)
     # normally status 400 if have an expired session
     status = resp.status_code
     result = resp.json()
@@ -112,22 +112,7 @@ def publish_point(video):
 
 def get_categories():
     # Fetch the main UFC Fight Pass category menu data
-    url = c_base_url + 'fightpass?format=json'
-    cj = cookielib.LWPCookieJar(COOKIE_FILE)
-    try:
-        cj.load(COOKIE_FILE, ignore_discard=False)
-    except:
-        pass
-
-    headers = {
-        'User-Agent': ua
-    }
-
-    s = requests.Session()
-    s.cookies = cj
-    resp = s.get(url, headers=headers, verify=True)
-    data = resp.json()
-
+    data = get_data(c_base_url + 'fightpass')
     results = []
 
     for c in data['subCategories']:
@@ -283,7 +268,7 @@ def get_data(url, params=None):
 
     s = requests.Session()
     s.cookies = cj
-    resp = s.get(url, headers=headers, params=params, verify=False)
+    resp = s.get(url, headers=headers, params=params)
     if not resp.status_code == 200:
         return None
 
@@ -303,7 +288,7 @@ def post_data(url, payload):
 
     s = requests.Session()
     s.cookies = cj
-    resp = s.post(url, data=payload, headers=headers, verify=True)
+    resp = s.post(url, data=payload, headers=headers)
     if not resp.status_code == 200:
         return None
 
