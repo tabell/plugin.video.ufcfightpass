@@ -76,9 +76,6 @@ def post_auth(creds):
 
 
 def publish_point(video):
-    # Fetch the stream url for the video
-    # TODO: if this fails, it may also be cause the cookie has expired / logged in on another device (status 400)
-    #  * in this case, we may need to re-auth, so we can play the video
     url = 'https://www.ufc.tv/service/publishpoint'
     headers = {
         'User-Agent': ua
@@ -106,8 +103,14 @@ def publish_point(video):
     if not result:
         return status, None
 
-    path = result['path'].replace('android', 'ced')
-    return status, path
+    o_path = result['path']
+    h_path = o_path.replace('android', 'ced')
+    # does the hd video resource exist?
+    resp = s.get(h_path, data=payload, headers=headers)
+    if resp.status_code == 404:
+        return status, o_path
+
+    return resp.status_code, h_path
 
 
 def get_categories():
