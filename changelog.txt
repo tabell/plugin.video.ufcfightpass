@@ -1,3 +1,8 @@
+[B]Version 1.2.0[/B]
+
+- Add paging feature to video listings
+- Default to SD video when HD is not available
+
 [B]Version 1.1.0[/B]
 
 - Add Live Event status indicator (identify which events are currently live)
