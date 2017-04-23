@@ -536,6 +536,7 @@ def play_video(v_id, v_title):
             dialog.ok('Authorization Error', 'Authorization to UFC Fight Pass failed.')
 
     if stream:
+        stream = stream + '|User-Agent=' + ua
         item = xbmcgui.ListItem(label=v_title)
         xbmc.Player().play(stream, item)
     else:
